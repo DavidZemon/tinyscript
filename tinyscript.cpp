@@ -31,7 +31,7 @@
 //
 //#define DEBUG
 #ifdef DEBUG
-#include <stdio.h>
+#include <PropWare/hmi/output/printer.h>
 #endif
 
 #define MAX_EXPR_LEVEL 5
@@ -43,33 +43,33 @@
 #define SYMSTACK_SIZE (2048/sizeof(Sym))
 #define VALSTACK_SIZE (1024/sizeof(Val))
 
-static int arena_size;
+static int  arena_size;
 static Byte *arena;
 
-static Sym *symptr;
-static Val *valptr;
+static Sym    *symptr;
+static Val    *valptr;
 static String pc;  // instruction pointer
 
 // fetch the next token
-static int curToken;
-static String token;
-static Val tokenVal;
+static int             curToken;
+static String          token;
+static Val             tokenVal;
 
 
-Val stringeq(String ai, String bi)
-{
+Val stringeq (String ai, String bi) {
     const Byte *a, *b;
-    int i, len;
-    
+    int        i, len;
+
     if (ai.len != bi.len) {
         return 0;
     }
-    a = ai.ptr;
-    b = bi.ptr;
-    len = ai.len;
+    a      = ai.ptr;
+    b      = bi.ptr;
+    len    = ai.len;
     for (i = 0; i < len; i++) {
         if (*a != *b) return 0;
-        a++; b++;
+        a++;
+        b++;
     }
     return 1;
 }
@@ -78,9 +78,8 @@ Val stringeq(String ai, String bi)
 // Utility functions
 //
 static void
-PrintString(String s)
-{
-    int len = s.len;
+PrintString (String s) {
+    int        len  = s.len;
     const Byte *ptr = s.ptr;
     while (len > 0) {
         outchar(*ptr);
@@ -90,21 +89,19 @@ PrintString(String s)
 }
 
 static void
-Newline(void)
-{
+Newline (void) {
     outchar('\n');
 }
 
 static void
-PrintNumber(Val v)
-{
+PrintNumber (Val v) {
     unsigned long x;
-    unsigned base = 10;
-    int prec = 1;
-    int digits = 0;
-    int c;
-    char buf[32];
-    
+    unsigned      base   = 10;
+    int           prec   = 1;
+    int           digits = 0;
+    int           c;
+    char          buf[32];
+
     if (v < 0) {
         outchar('-');
         x = -v;
@@ -127,12 +124,11 @@ PrintNumber(Val v)
 
 // look up a symbol by name
 static Sym *
-LookupSym(String name)
-{
+LookupSym (String name) {
     Sym *s;
 
     s = symptr;
-    while ((intptr_t)s > (intptr_t)arena) {
+    while ((intptr_t) s > (intptr_t) arena) {
         --s;
         if (stringeq(s->name, name)) {
             return s;
@@ -160,8 +156,7 @@ LookupSym(String name)
 #define TOK_PROCDEF 'F'
 #define TOK_SYNTAX_ERR 'Z'
 
-static void ResetToken()
-{
+static void ResetToken () {
     token.len = 0;
     token.ptr = pc.ptr;
 }
@@ -169,9 +164,7 @@ static void ResetToken()
 //
 // get next character from the program counter
 // returns -1 on end of file
-static int
-GetChar()
-{
+static int GetChar () {
     int c;
     if (pc.len == 0)
         return -1;
@@ -182,68 +175,41 @@ GetChar()
     return c;
 }
 
-static void
-IgnoreLastChar()
-{
+static void IgnoreLastChar () {
     token.len--;
 }
+
 //
 // undo last getchar
 // (except at end of input)
 //
-static void
-UngetChar()
-{
+static void UngetChar () {
     pc.len++;
     pc.ptr--;
     token.len--;
 }
 
-static int charin(int c, const char *str)
-{
+static int charin (int c, const char *str) {
     while (*str) {
         if (c == *str++) return 1;
     }
     return 0;
 }
-static int isspace(int c)
-{
-    return charin(c, " \t");
-}
 
-static int isdigit(int c)
-{
-    return (c >= '0' && c <= '9');
-}
-static int islower(int c)
-{
-    return (c >= 'a' && c <= 'z');
-}
-static int isupper(int c)
-{
-    return (c >= 'A' && c <= 'A');
-}
-static int isalpha(int c)
-{
-    return islower(c) || isupper(c);
-}
-static int isidpunct(int c)
-{
+static int isidpunct (int c) {
     return charin(c, ".:_");
 }
-static int isidentifier(int c)
-{
+
+static int isidentifier (int c) {
     return isalpha(c) || isidpunct(c);
 }
 
-static int notquote(int c)
-{
+static int notquote (int c) {
     return (c >= 0) && !charin(c, "\"\n");
 }
 
 static void
-GetSpan(int (*testfn)(int))
-{
+GetSpan (int (*testfn) (int)) {
     int c;
     do {
         c = GetChar();
@@ -252,19 +218,19 @@ GetSpan(int (*testfn)(int))
         UngetChar();
     }
 }
+
 static int
-isoperator(int c) {
+isoperator (int c) {
     return charin(c, "+-/*=<>&|^");
 }
 
 static int
-doNextToken(int israw)
-{
+doNextToken (int israw) {
     int c;
     int r = -1;
-    
+
     ResetToken();
-    for(;;) {
+    for (; ;) {
         c = GetChar();
         if (isspace(c)) {
             ResetToken();
@@ -282,7 +248,7 @@ doNextToken(int israw)
     } else if (isdigit(c)) {
         GetSpan(isdigit);
         r = TOK_NUMBER;
-    } else if ( isalpha(c) ) {
+    } else if (isalpha(c)) {
         Sym *sym;
         GetSpan(isidentifier);
         r = TOK_SYMBOL;
@@ -306,8 +272,8 @@ doNextToken(int israw)
         Sym *sym;
         GetSpan(isoperator);
         sym = LookupSym(token);
-        if (sym && (sym->type&0xff) == OPERATOR) {
-            r = TOK_BINOP | (sym->type & 0xff00);
+        if (sym && (sym->type & 0xff) == OPERATOR) {
+            r        = TOK_BINOP | (sym->type & 0xff00);
             tokenVal = sym->value;
         } else {
             r = TOK_SYNTAX_ERR;
@@ -339,25 +305,31 @@ doNextToken(int israw)
         r = c;
     }
 #ifdef DEBUG
-    printf("Token[%c / %x] = ", r&0xff, r);
+    pwOut << "Token[" << (char) r << " / 0x";
+    pwOut.put_uint((unsigned int) r, 16, 2);
+    pwOut << "] = ";
     PrintString(token);
-    printf("\n");
+    pwOut << '\n';
 #endif
     curToken = r;
     return r;
 }
 
-static int NextToken() { return doNextToken(0); }
-static int NextRawToken() { return doNextToken(1); }
+static int NextToken () {
+    return doNextToken(0);
+}
+
+static int NextRawToken () {
+    return doNextToken(1);
+}
 
 // push a number on the result stack
 // this stack grows down from the top of the arena
 
 void
-Push(Val x)
-{
+Push (Val x) {
     --valptr;
-    if ((intptr_t)valptr < (intptr_t)symptr) {
+    if ((intptr_t) valptr < (intptr_t) symptr) {
         // out of memory!
         abort();
     }
@@ -366,10 +338,9 @@ Push(Val x)
 
 // pop a number off the result stack
 Val
-Pop()
-{
+Pop () {
     Val r = 0;
-    if ((intptr_t)valptr < (intptr_t)(arena+arena_size)) {
+    if ((intptr_t) valptr < (intptr_t) (arena + arena_size)) {
         r = *valptr++;
     }
     return r;
@@ -377,74 +348,68 @@ Pop()
 
 // convert a string to a number
 Val
-StringToNum(String s)
-{
-    Val r = 0;
-    int c;
+StringToNum (String s) {
+    Val        r    = 0;
+    int        c;
     const Byte *ptr = s.ptr;
-    int len = s.len;
+    int        len  = s.len;
     while (len-- > 0) {
         c = *ptr++;
         if (!isdigit(c)) break;
-        r = 10*r + (c-'0');
+        r = 10 * r + (c - '0');
     }
     return r;
 }
 
 // define a symbol
 Sym *
-DefineSym(String name, int typ, Val value)
-{
+DefineSym (String name, int typ, Val value) {
     Sym *s = symptr;
 
     if (name.ptr == NULL) {
         return NULL;
     }
     symptr++;
-    if ( (intptr_t)symptr >= (intptr_t)valptr) {
+    if ((intptr_t) symptr >= (intptr_t) valptr) {
         //out of memory
         return NULL;
     }
-    s->name = name;
+    s->name  = name;
     s->value = value;
-    s->type = typ;
+    s->type  = typ;
     return s;
 }
 
 static Sym *
-DefineVar(String name)
-{
+DefineVar (String name) {
     return DefineSym(name, INT, 0);
 }
 
 String
-Cstring(const char *str)
-{
+Cstring (const char *str) {
     String x;
-    
+
     x.len = strlen(str);
     x.ptr = str;
     return x;
 }
 
 int
-TinyScript_Define(const char *name, int typ, Val val)
-{
+TinyScript_Define (const char *name, int typ, Val val) {
     Sym *s;
     s = DefineSym(Cstring(name), typ, val);
     if (!s) return TS_ERR_NOMEM;
     return TS_ERR_OK;
 }
 
-extern int ParseExpr();
+extern int ParseExpr ();
 
 static int
-ParseExprList(int *countptr)
-{
+ParseExprList (int *countptr) {
     int err;
     int count = 0;
     int c;
-    
+
     do {
         err = ParseExpr();
         if (err != TS_ERR_OK) {
@@ -455,7 +420,7 @@ ParseExprList(int *countptr)
         if (c == ',') {
             NextToken();
         }
-    } while (c==',');
+    } while (c == ',');
     *countptr = count;
     return TS_ERR_OK;
 }
@@ -464,8 +429,7 @@ ParseExprList(int *countptr)
 // returns 0 if valid, non-zero if syntax error
 
 static int
-ParseExpr0()
-{
+ParseExpr0 () {
     int c;
     int err;
     c = curToken;
@@ -489,17 +453,17 @@ ParseExpr0()
         NextToken();
         return TS_ERR_OK;
     } else if (c == TOK_BUILTIN) {
-        Cfunc op = (Cfunc)tokenVal;
-        int paramCount = 0;
-        Val arg[MAX_BUILTIN_PARAMS];
+        Cfunc op         = (Cfunc) tokenVal;
+        int   paramCount = 0;
+        Val   arg[MAX_BUILTIN_PARAMS];
         c = NextToken();
         if (c != '(') return TS_ERR_SYNTAX;
         c = NextToken();
         if (c != ')') {
             err = ParseExprList(&paramCount);
-            c = curToken;
+            c   = curToken;
         }
-        if (c!=')') {
+        if (c != ')') {
             return TS_ERR_SYNTAX;
         }
         NextToken();
@@ -521,9 +485,9 @@ ParseExpr0()
         }
         Push(op(arg[0], arg[1], arg[2], arg[3]));
         return TS_ERR_OK;
-    } else if ( (c & 0xff) == TOK_BINOP ) {
+    } else if ((c & 0xff) == TOK_BINOP) {
         // binary operator
-        Opfunc op = (Opfunc)tokenVal;
+        Opfunc op = (Opfunc) tokenVal;
         NextToken();
         err = ParseExpr();
         if (err == TS_ERR_OK) {
@@ -539,24 +503,23 @@ ParseExpr0()
 // parse a level n expression
 // level 0 is the lowest level
 static int
-ParseExprLevel(int n)
-{
+ParseExprLevel (int n) {
     int err = TS_ERR_OK;
     int c;
 
     if (n == 0) {
         return ParseExpr0();
     }
-    err = ParseExprLevel(n-1);
+    err = ParseExprLevel(n - 1);
     if (err != TS_ERR_OK) return err;
     c = curToken;
-    while ( (c & 0xff) == TOK_BINOP ) {
-        int level = (c>>8) & 0xff;
-        Opfunc op = (Opfunc)tokenVal;
+    while ((c & 0xff) == TOK_BINOP) {
+        int    level = (c >> 8) & 0xff;
+        Opfunc op    = (Opfunc) tokenVal;
         if (level == n) {
             Val a, b;
             NextToken();
-            err = ParseExprLevel(n-1);
+            err = ParseExprLevel(n - 1);
             if (err != TS_ERR_OK) {
                 Pop();
                 return err;
@@ -573,31 +536,28 @@ ParseExprLevel(int n)
 }
 
 int
-ParseExpr()
-{
+ParseExpr () {
     return ParseExprLevel(MAX_EXPR_LEVEL);
 }
 
 static char *
-stack_alloc(int len)
-{
-    int mask = sizeof(Val)-1;
+stack_alloc (int len) {
+    int      mask = sizeof(Val) - 1;
     intptr_t base;
-    
-    len = (len + mask) & ~mask;
-    base = ((intptr_t)valptr) - len;
-    if (base < (intptr_t)symptr) {
+
+    len  = (len + mask) & ~mask;
+    base = ((intptr_t) valptr) - len;
+    if (base < (intptr_t) symptr) {
         return NULL;
     }
-    valptr = (Val *)base;
-    return (char *)base;
+    valptr = (Val *) base;
+    return (char *) base;
 }
 
 static String
-DupString(String orig)
-{
+DupString (String orig) {
     String x;
-    char *ptr;
+    char   *ptr;
     x.len = orig.len;
     ptr = stack_alloc(x.len);
     if (ptr) {
@@ -607,32 +567,31 @@ DupString(String orig)
     return x;
 }
 
-static int ParseString(String str, int saveStrings, int topLevel);
+static int ParseString (String str, int saveStrings, int topLevel);
 
 //
 // this is slightly different in that it may return the non-erro TS_ERR_ELSE
 // to signify that the condition was false
 //
-static int ParseIf()
-{
+static int ParseIf () {
     String ifpart, elsepart;
-    int haveelse = 0;
-    Val cond;
-    int c;
-    int err;
-    
-    c = NextToken();
+    int    haveelse = 0;
+    Val    cond;
+    int    c;
+    int    err;
+
+    c   = NextToken();
     err = ParseExpr();
     if (err != TS_ERR_OK) {
         return err;
     }
     cond = Pop();
-    c = curToken;
+    c    = curToken;
     if (c != TOK_STRING) {
         return TS_ERR_SYNTAX;
     }
     ifpart = token;
-    c = NextToken();
+    c      = NextToken();
     if (c == TOK_ELSE) {
         c = NextToken();
         if (c != TOK_STRING) {
@@ -657,18 +616,17 @@ static int ParseIf()
 // a temporary string)
 //
 static int
-ParseStmt(int saveStrings)
-{
-    int c;
+ParseStmt (int saveStrings) {
+    int    c;
     String name;
-    Val val;
-    int err;
-    
+    Val    val;
+    int    err;
+
     c = curToken;
-    
+
     if (c == TOK_VARDEF) {
         // a definition var a=x
-        c=NextRawToken(); // we want to get VAR_SYMBOL directly
+        c = NextRawToken(); // we want to get VAR_SYMBOL directly
         if (c != TOK_SYMBOL) return TS_ERR_SYNTAX;
         if (saveStrings) {
             name = DupString(token);
@@ -684,7 +642,7 @@ ParseStmt(int saveStrings)
         // is this a=expr?
         Sym *s;
         name = token;
-        c = NextToken();
+        c    = NextToken();
         // we expect the "=" operator
         // verify that it is "="
         if (token.ptr[0] != '=' || token.len != 1) {
@@ -696,13 +654,13 @@ ParseStmt(int saveStrings)
             return err;
         }
         val = Pop();
-        s = LookupSym(name);
+        s   = LookupSym(name);
         if (!s) {
             return TS_ERR_UNKNOWN_SYM; // unknown symbol
         }
         s->value = val;
     } else if (c == TOK_PRINT) {
-    print_more:
+        print_more:
         c = NextToken();
         if (c == TOK_STRING) {
             PrintString(token);
@@ -726,8 +684,8 @@ ParseStmt(int saveStrings)
     } else if (c == TOK_WHILE) {
         String savepc;
         savepc = pc;
-    again:
-        err = ParseIf();
+        again:
+        err    = ParseIf();
         if (err == TS_ERR_OK_ELSE) {
             return TS_ERR_OK;
         } else if (err == TS_ERR_OK) {
@@ -738,24 +696,24 @@ ParseStmt(int saveStrings)
     } else if (c == TOK_BUILTIN) {
         err = ParseExpr0();
         if (err == TS_ERR_OK) {
-            (void)Pop(); // fix up the stack
+            (void) Pop(); // fix up the stack
         }
         return err;
     } else if (c == TOK_PROC) {
-        Sym *sym = LookupSym(token);
+        Sym    *sym = LookupSym(token);
         String body;
         if (!sym) return TS_ERR_SYNTAX;
-        body.ptr = (const char *)sym->value;
+        body.ptr = (const char *) sym->value;
         body.len = sym->aux;
         return ParseString(body, 0, 0);
     } else if (c == TOK_PROCDEF) {
-        Sym *sym;
+        Sym    *sym;
         String name;
         String body;
         c = NextRawToken(); // do not interpret the symbol
         if (c != TOK_SYMBOL) return TS_ERR_SYNTAX;
         name = token;
-        c = NextToken();
+        c    = NextToken();
         if (c != TOK_STRING) return TS_ERR_SYNTAX;
         body = token;
         // FIXME here is where things get tricky: we have to
@@ -766,7 +724,7 @@ ParseStmt(int saveStrings)
             name = DupString(name);
             body = DupString(body);
         }
-        sym = DefineSym(name, PROC, (intptr_t)body.ptr);
+        sym  = DefineSym(name, PROC, (intptr_t) body.ptr);
         if (!sym) return TS_ERR_NOMEM;
         sym->aux = body.len;
         NextToken();
@@ -777,15 +735,14 @@ ParseStmt(int saveStrings)
 }
 
 static int
-ParseString(String str, int saveStrings, int topLevel)
-{
+ParseString (String str, int saveStrings, int topLevel) {
     String savepc = pc;
-    Sym* savesymptr = symptr;
+    Sym *savesymptr = symptr;
     int c;
     int r;
-    
+
     pc = str;
-    for(;;) {
+    for (; ;) {
         c = NextToken();
         while (c == '\n' || c == ';') {
             c = NextToken();
@@ -811,65 +768,111 @@ ParseString(String str, int saveStrings, int topLevel)
 //
 // builtin functions
 //
-static Val prod(Val x, Val y) { return x*y; }
-static Val quot(Val x, Val y) { return x/y; }
-static Val sum(Val x, Val y) { return x+y; }
-static Val diff(Val x, Val y) { return x-y; }
-static Val bitand(Val x, Val y) { return x&y; }
-static Val bitor(Val x, Val y) { return x|y; }
-static Val bitxor(Val x, Val y) { return x^y; }
-static Val shl(Val x, Val y) { return x<<y; }
-static Val shr(Val x, Val y) { return x>>y; }
-static Val equals(Val x, Val y) { return x==y; }
-static Val ne(Val x, Val y) { return x!=y; }
-static Val lt(Val x, Val y) { return x<y; }
-static Val le(Val x, Val y) { return x<=y; }
-static Val gt(Val x, Val y) { return x>y; }
-static Val ge(Val x, Val y) { return x>=y; }
+static Val prod (Val x, Val y) {
+    return x * y;
+}
+
+static Val quot (Val x, Val y) {
+    return x / y;
+}
+
+static Val sum (Val x, Val y) {
+    return x + y;
+}
+
+static Val diff (Val x, Val y) {
+    return x - y;
+}
+
+static Val bit_and(Val x, Val y) {
+return x &y;
+}
+
+static Val bit_or(
+Val x, Val
+y) {
+return x|
+  y;
+}
+
+static Val bitxor (Val x, Val y) {
+    return x ^ y;
+}
+
+static Val shl (Val x, Val y) {
+    return x << y;
+}
+
+static Val shr (Val x, Val y) {
+    return x >> y;
+}
+
+static Val equals (Val x, Val y) {
+    return x == y;
+}
+
+static Val ne (Val x, Val y) {
+    return x != y;
+}
+
+static Val lt (Val x, Val y) {
+    return x < y;
+}
+
+static Val le (Val x, Val y) {
+    return x <= y;
+}
+
+static Val gt (Val x, Val y) {
+    return x > y;
+}
+
+static Val ge (Val x, Val y) {
+    return x >= y;
+}
 
 static struct def {
     const char *name;
-    int toktype;
-    intptr_t val;
+    int        toktype;
+    intptr_t   val;
 } defs[] = {
-    // keywords
-    { "if",    TOKEN, TOK_IF },
-    { "else",  TOKEN, TOK_ELSE },
-    { "while", TOKEN, TOK_WHILE },
-    { "print", TOKEN, TOK_PRINT },
-    { "var",   TOKEN, TOK_VARDEF },
-    { "proc",  TOKEN, TOK_PROCDEF },
-    // operators
-    { "*",     BINOP(1), (intptr_t)prod },
-    { "/",     BINOP(1), (intptr_t)quot },
-    { "+",     BINOP(2), (intptr_t)sum },
-    { "-",     BINOP(2), (intptr_t)diff },
-    { "&",     BINOP(3), (intptr_t)bitand },
-    { "|",     BINOP(3), (intptr_t)bitor },
-    { "^",     BINOP(3), (intptr_t)bitxor },
-    { ">>",    BINOP(3), (intptr_t)shr },
-    { "<<",    BINOP(3), (intptr_t)shl },
-    { "=",     BINOP(4), (intptr_t)equals },
-    { "<>",    BINOP(4), (intptr_t)ne },
-    { "<",     BINOP(4), (intptr_t)lt },
-    { "<=",    BINOP(4), (intptr_t)le },
-    { ">",     BINOP(4), (intptr_t)gt },
-    { ">=",    BINOP(4), (intptr_t)ge },
+        // keywords
+        {"if",    TOKEN, TOK_IF},
+        {"else",  TOKEN, TOK_ELSE},
+        {"while", TOKEN, TOK_WHILE},
+        {"print", TOKEN, TOK_PRINT},
+        {"var",   TOKEN, TOK_VARDEF},
+        {"proc",  TOKEN, TOK_PROCDEF},
+        // operators
+        {"*",     BINOP(1), (intptr_t) prod},
+        {"/",     BINOP(1), (intptr_t) quot},
+        {"+",     BINOP(2), (intptr_t) sum},
+        {"-",     BINOP(2), (intptr_t) diff},
+        {"&",     BINOP(3), (intptr_t) bit_and},
+        {"|",     BINOP(3), (intptr_t) bit_or },
+        {"^",     BINOP(3), (intptr_t) bitxor},
+        {">>",    BINOP(3), (intptr_t) shr},
+        {"<<",    BINOP(3), (intptr_t) shl},
+        {"=",     BINOP(4), (intptr_t) equals},
+        {"<>",    BINOP(4), (intptr_t) ne},
+        {"<",     BINOP(4), (intptr_t) lt},
+        {"<=",    BINOP(4), (intptr_t) le},
+        {">",     BINOP(4), (intptr_t) gt},
+        {">=",    BINOP(4), (intptr_t) ge},
 
-    { NULL, 0, 0 }
+        {NULL, 0,           0}
 };
 
 int
-TinyScript_Init(void *mem, int mem_size)
-{
+TinyScript_Init (void *mem, int mem_size) {
     int i;
     int err;
-    
-    arena = (Byte *)mem;
+
+    arena      = (Byte *) mem;
     arena_size = mem_size;
-    symptr = (Sym *)arena;
-    valptr = (Val *)(arena + arena_size);
-    for (i = 0; defs[i].name; i++) {
+    symptr     = (Sym *) arena;
+    valptr     = (Val *) (arena + arena_size);
+    for (i     = 0; defs[i].name; i++) {
         err = TinyScript_Define(defs[i].name, defs[i].toktype, defs[i].val);
         if (err != TS_ERR_OK)
             return err;
@@ -878,7 +881,6 @@ TinyScript_Init(void *mem, int mem_size)
 }
 
 int
-TinyScript_Run(const char *buf, int saveStrings, int topLevel)
-{
+TinyScript_Run (const char *buf, int saveStrings, int topLevel) {
     return ParseString(Cstring(buf), saveStrings, topLevel);
 }

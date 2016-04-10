@@ -3,3 +3,6 @@
 *.zip
 *~
 tstest
+
+.idea/
+bin/

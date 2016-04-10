@@ -1,7 +1,6 @@
-#ifndef TINYSCRIPT_H
-#define TINYSCRIPT_H
+#pragma once
 
-#include <stdint.h>
+#include <PropWare/PropWare.h>
 
 // errors
 // all the ParseXXX functions return 0 on success, a non-zero
@@ -66,5 +65,3 @@ int TinyScript_Run(const char *s, int saveStrings, int topLevel);
 // provided by our caller
 extern int inchar(void);
 extern void outchar(int c);
-
-#endif
